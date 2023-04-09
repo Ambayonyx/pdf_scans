@@ -1,5 +1,6 @@
 import argparse
 import logging
+from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
@@ -41,22 +42,35 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--front', action='store',
+                        required=True,
                         help='The PDF with the scans of the front side of the pages.')
     parser.add_argument('--back', action='store',
+                        required=True,
                         help='The PDF with the scans of the back side of the pages.')
     parser.add_argument('--output', action='store',
+                        required=True,
                         help='The PDF in which the result shall be stored')
     parser.add_argument('--back_reversed', action='store_true',
                         help='Use this option, when the back side pages have been scanned in the reverse order'
-                        'From scanning perspective, this is the easiest.'
-                        ' First scan the front side to a file, then rotate the stack and scan the back side to a file.')
+                             'From scanning perspective, this is the easiest.'
+                             ' First scan the front side to a file, then rotate the stack and scan the back side to a file.')
+    parser.add_argument('--folder', action='store',
+                        help='When provided this folder is prepended to the input and output paths.')
 
     args = parser.parse_args()
 
     try:
-        merge_single_sides_canned_files(front_pdf=args.front,
-                                        back_pdf=args.back,
-                                        merged_pdf=args.output,
+        front = Path(args.front)
+        back = Path(args.back)
+        output = Path(args.output)
+        if args.folder:
+            folder = Path(args.folder)
+            front = folder / front
+            back = folder / back
+            output = folder / output
+        merge_single_sides_canned_files(front_pdf=front,
+                                        back_pdf=back,
+                                        merged_pdf=output,
                                         back_scanned_reverse=True)
     except FileNotFoundError as e:
         print(f'Required file does not exist or is not readable: {e.filename}')
