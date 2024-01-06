@@ -19,6 +19,8 @@ Scripts to handle pdf_scans.
                      easiest. First scan the front side to a file, then rotate
                      the stack and scan the back side to a file. (default:
                      False)
+    --folder FOLDER  When provided this folder is prepended to the input and output 
+                     paths. (default: None)
 
   Process finished with exit code 0
 ```
