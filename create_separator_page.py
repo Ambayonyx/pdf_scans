@@ -1,5 +1,4 @@
 import io
-import uuid
 from argparse import ArgumentParser
 from uuid import UUID
 
@@ -11,8 +10,11 @@ from reportlab.lib import utils
 # import pypng
 import pyqrcode
 
-def create_id_text(id: UUID, side:str):
-    return f'{id} : {side}'
+import qr_codes
+
+
+def create_id_text(identifier: UUID, side:str):
+    return f'{identifier} : {side}'
 
 def points_from_inch(inch: float) -> float:
     return inch * 72
@@ -22,12 +24,12 @@ def points_from_cm(cm: float) -> float:
 def points_from_mm(mm: float) -> float:
     return points_from_cm(mm / 25.4)
 
-def from_cm(*args):
-    return (points_from_cm(a) for a in args)
+def from_cm(*cm_args):
+    return (points_from_cm(a) for a in cm_args)
 
-def print_lines(canvas, left, top, distance, lines):
+def print_lines(drawing_canvas, left, top, distance, lines):
     for line in lines:
-        canvas.drawString(*from_cm(left, top), line)
+        drawing_canvas.drawString(*from_cm(left, top), line)
         top -= distance
 
 
@@ -35,14 +37,13 @@ def main(number_of_sheets: int):
     c = canvas.Canvas("data/output/content_pdf.pdf", pagesize=A4)
 
     for page_nr in range(number_of_sheets):
-        page_id = uuid.uuid4()
-        create_page(c, page_id, "FRONT", "Voor")
-        create_page(c, page_id, "BACK", "Achter")
+        create_page(c, qr_codes.Side.FRONT, "Voor")
+        create_page(c, qr_codes.Side.BACK, "Achter")
 
     c.save()
 
 
-def create_page(c, page_id, side_en, side_local:str):
+def create_page(c, side_en: qr_codes.Side, side_local:str):
     # Define the layout
     left_margin = 2.0
     top_line = 26
@@ -60,7 +61,7 @@ def create_page(c, page_id, side_en, side_local:str):
     top_line -= 2
 
     # Print usage
-    print_lines(canvas=c,
+    print_lines(drawing_canvas=c,
                 left=left_margin,
                 top=22,
                 distance=1,
@@ -73,10 +74,12 @@ def create_page(c, page_id, side_en, side_local:str):
                 ])
 
     # Print QR code
-    id_text = create_id_text(page_id, side_en)
     positie = from_cm(21 / 2 - 3, 29 / 2 - 4)
+    id_text = str(qr_codes.QrCode(side_en))
 
     # Create the QR code
+    c.setFont("Helvetica", 7)
+
     code = pyqrcode.create(id_text)
 
     # put it as PNG in a memory buffer
@@ -90,7 +93,7 @@ def create_page(c, page_id, side_en, side_local:str):
                 height=points_from_cm(3))
 
     # print QR code in text
-    print_lines(canvas=c,
+    print_lines(drawing_canvas=c,
                 left=left_margin,
                 top=8,
                 distance=1,
@@ -98,6 +101,7 @@ def create_page(c, page_id, side_en, side_local:str):
                     f'QRCODE >{id_text}<'
                 ])
     c.showPage()
+    print(f"Created: {id_text}")
 
 if __name__ == "__main__":
     parser = ArgumentParser("create_separator_pages")

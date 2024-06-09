@@ -71,7 +71,7 @@ def collect_input_files(workdir: Path) -> List[Path]:
 
 def get_seperation_page_id(pixmap: fitz.Pixmap) -> Optional[SeparatorPage]:
     page_info = None
-    page_seperator_re = re.compile(r"(?P<uuid>[\dabcdef]{8}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{12}) : (?P<side>FRONT|BACK)")
+    page_seperator_re = re.compile(r"(?P<uuid>[\dabcdef]{8}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{12}) : (?>Side.)?(?P<side>FRONT|BACK)")
 
     try:
         data = pixmap.tobytes("png", 100)
