@@ -185,11 +185,13 @@ def all_documents_wrapped_in_separators(documents: List[Document]) -> bool:
 
 def merge_documents(documents: List[Document]) -> Dict[str, List[Page]]:
     if not all_documents_wrapped_in_separators(documents):
-        return
+        logging.error("Not all documents were wrapped in separators")
+        return dict()
     logging.info("All documents wrapped in separators")
 
     if not all_separators_found(documents):
-        return
+        logging.error("Not all separator pages were found!")
+        return dict()
     logging.info("All separator pages found!")
 
     # make sure to reverse the documents starting with a BACK sheet

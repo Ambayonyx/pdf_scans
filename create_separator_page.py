@@ -1,4 +1,5 @@
 import io
+import uuid
 from argparse import ArgumentParser
 from uuid import UUID
 
@@ -37,13 +38,17 @@ def main(number_of_sheets: int):
     c = canvas.Canvas("data/output/content_pdf.pdf", pagesize=A4)
 
     for page_nr in range(number_of_sheets):
-        create_page(c, qr_codes.Side.FRONT, "Voor")
-        create_page(c, qr_codes.Side.BACK, "Achter")
+        create_pages(c)
 
     c.save()
 
+def create_pages(c):
+    page_identifier = uuid.uuid4()
+    create_page(c, qr_codes.Side.FRONT, "Voor", identifier=page_identifier)
+    create_page(c, qr_codes.Side.BACK, "Achter", identifier=page_identifier)
 
-def create_page(c, side_en: qr_codes.Side, side_local:str):
+
+def create_page(c, side_en: qr_codes.Side, side_local:str, identifier: uuid.UUID):
     # Define the layout
     left_margin = 2.0
     top_line = 26
@@ -75,7 +80,8 @@ def create_page(c, side_en: qr_codes.Side, side_local:str):
 
     # Print QR code
     positie = from_cm(21 / 2 - 3, 29 / 2 - 4)
-    id_text = str(qr_codes.QrCode(side_en))
+
+    id_text = str(qr_codes.QrCode(side_en, identifier=identifier))
 
     # Create the QR code
     c.setFont("Helvetica", 7)
