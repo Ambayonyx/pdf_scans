@@ -184,13 +184,32 @@ def all_documents_wrapped_in_separators(documents: List[Document]) -> bool:
 
 
 def merge_documents(documents: List[Document]) -> Dict[str, List[Page]]:
+    """merge_documents of PDF documents into set of related pages, ignoring the separator pages.
+
+    Every matching PDF input document pair (front & back) must have, for a 2 original document set:
+    - SEP_A_front, doc_a_page_1, .... SEP_B_front, doc_b_page_1, SEP_C_front
+    - SEP_C_front, doc_c_page_n, .... SEP_B_back, doc_b_page_n, SEP_A_back
+
+    This means that:
+    - all original documents must be wrapped in separators,
+    - all front/back separator pairs must be found.
+
+    :param documents: PDF documents with separators and Front and Back sides.
+    :return: List of documents with pages where Front and Back are in the right order. The document will have as an
+             ID the UUID of the separator page.
+    """
     if not all_documents_wrapped_in_separators(documents):
-        logging.error("Not all documents were wrapped in separators")
+        msg = "Not all documents were wrapped in separators"
+        logging.error(msg)
+        print(msg)
+
         return dict()
     logging.info("All documents wrapped in separators")
 
     if not all_separators_found(documents):
-        logging.error("Not all separator pages were found!")
+        msg = "Not all separator pages were found!""Not all documents were wrapped in separators"
+        logging.error(msg)
+        print(msg)
         return dict()
     logging.info("All separator pages found!")
 
@@ -204,13 +223,11 @@ def merge_documents(documents: List[Document]) -> Dict[str, List[Page]]:
         else:
             reverse_documents.append(doc)
 
-
     # reverse the pages of the reverse documents
     for d in reverse_documents:
         d.pages = list(reversed(d.pages))
 
     # the first page of the forward and the reverse will contain the same id. one of the front and the other of the back
-
     forward_documents_map = {doc.pages[0].id: doc for doc in forward_documents}
     reverse_documents_map = {doc.pages[0].id: doc for doc in reverse_documents}
 
@@ -219,6 +236,29 @@ def merge_documents(documents: List[Document]) -> Dict[str, List[Page]]:
         zipped = zip(forward_documents_map[sep_id].pages, reverse_documents_map[sep_id].pages)
         merged_pages[sep_id] = [page for pair in zipped for page in pair]
     return merged_pages
+
+def split_documents(documents: List[Document]) -> Dict[str, List[Page]]:
+    """split_documents of PDF documents into set of related pages, ignoring the separator pages.
+
+    Every PDF input document is single_sided, either front or back. For a 2 original document set:
+    - SEP_A_front, doc_a_page_1, .... SEP_B_front, doc_b_page_1, SEP_C_front
+
+    This shows that:
+    - all input documents must be wrapped in separators,
+
+    :param documents: PDF documents with separators and Front or Back sides.
+    :return: List of documents with pages. The document will have as an ID the UUID of the separator page.
+    """
+    if not all_documents_wrapped_in_separators(documents):
+        msg = "Not all documents were wrapped in separators"
+        logging.error(msg)
+        print(msg)
+
+        return dict()
+    logging.info("All documents wrapped in separators")
+
+    split_pages = {doc.pages[0].id: doc.pages for doc in documents}
+    return split_pages
 
 def create_documents_definitions(outputdir: Path, mergedpages: Dict[str, List[Page]]) -> Dict[Path, List[Page]]:
     documents: Dict[Path, List[Page]] = {}
@@ -273,6 +313,9 @@ def main():
     parser.add_argument('--output_dir', '-o', type=str,
                         default=str(default_output_dir),
                         help='Directory where the output documents will be placed.')
+    parser.add_argument('--single_sided', '-s',
+                        action='store_true',
+                        help='Directory where the output documents will be placed.')
     parser.add_argument('--log_level', '-ll', type=str,
                         default=default_loglevel,
                         help='Directory where the output documents will be placed.')
@@ -313,11 +356,19 @@ def main():
     pdf_files: List[Path] = collect_input_files(input_dir)
     input_documents: List[Document] = parse_pdf_files(pdf_files, debug_output_dir)
     print_documents(input_documents)
-    merged_pages: Dict[str, List[Page]] = merge_documents(input_documents)
-    original_documents: Dict[Path, List[Page]] = create_documents_definitions(output_dir, merged_pages)
 
-    for new_path, pages in original_documents.items():
-        store_document(new_path, pages)
+    # TODO: combine the paths again
+    if args.single_sided:
+        split_pages: Dict[str, List[Page]] = split_documents(input_documents)
+        original_documents: Dict[Path, List[Page]] = create_documents_definitions(output_dir, split_pages)
+        for new_path, pages in original_documents.items():
+            store_document(new_path, pages)
+    else:
+        merged_pages: Dict[str, List[Page]] = merge_documents(input_documents)
+        original_documents: Dict[Path, List[Page]] = create_documents_definitions(output_dir, merged_pages)
+
+        for new_path, pages in original_documents.items():
+            store_document(new_path, pages)
 
 
     print("Done!")
