@@ -28,7 +28,7 @@ def points_from_mm(mm: float) -> float:
 def from_cm(*cm_args):
     return (points_from_cm(a) for a in cm_args)
 
-def print_lines(drawing_canvas, left, top, distance, lines):
+def print_lines(drawing_canvas: canvas.Canvas, left: int, top: int, distance: int, lines: list[str]):
     for line in lines:
         drawing_canvas.drawString(*from_cm(left, top), line)
         top -= distance
@@ -37,18 +37,18 @@ def print_lines(drawing_canvas, left, top, distance, lines):
 def main(number_of_sheets: int):
     c = canvas.Canvas("data/output/content_pdf.pdf", pagesize=A4)
 
-    for page_nr in range(number_of_sheets):
+    for _ in range(number_of_sheets):
         create_pages(c)
 
     c.save()
 
-def create_pages(c):
+def create_pages(c: canvas.Canvas):
     page_identifier = uuid.uuid4()
     create_page(c, qr_codes.Side.FRONT, "Voor", identifier=page_identifier)
     create_page(c, qr_codes.Side.BACK, "Achter", identifier=page_identifier)
 
 
-def create_page(c, side_en: qr_codes.Side, side_local:str, identifier: uuid.UUID):
+def create_page(c: canvas.Canvas, side_en: qr_codes.Side, side_local:str, identifier: uuid.UUID):
     # Define the layout
     left_margin = 2.0
     top_line = 26
@@ -100,7 +100,7 @@ def create_page(c, side_en: qr_codes.Side, side_local:str, identifier: uuid.UUID
 
     # print QR code in text
     print_lines(drawing_canvas=c,
-                left=left_margin,
+                left=int(left_margin),
                 top=8,
                 distance=1,
                 lines=[

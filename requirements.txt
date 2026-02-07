@@ -1,8 +1,8 @@
-pypdf~=3.7.0
-Pillow~=9.5.0
-future~=0.18.3
+pypdf~=6.6.2
+Pillow~=12.1.0
+future~=1.0.0
 pathlib~=1.0.1
-tqdm~=4.66.1
 pyzbar~=0.1.9
 PyQRCode~=1.2.1
-reportlab~=4.0.9
+pypng~=0.20220715.0
+reportlab~=4.4.9
