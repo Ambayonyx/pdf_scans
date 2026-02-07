@@ -10,9 +10,8 @@ import os
 from typing import List, Dict, Any, Optional
 
 import fitz  # pip install --upgrade pip; pip install --upgrade pymupdf
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfWriter
 from pyzbar.wrapper import ZBarSymbol
-from tqdm import tqdm  # pip install tqdm
 from pyzbar.pyzbar import decode
 from PIL import Image
 
@@ -64,7 +63,7 @@ def collect_input_files(workdir: Path) -> List[Path]:
     pdf_files: List[Path] = []
     for each_path in os.listdir(workdir):
         if ".pdf" in each_path:
-            pdf_files.append(os.path.join(workdir, each_path))
+            pdf_files.append(Path(os.path.join(workdir, each_path)))
     logging.debug(f'Found {len(pdf_files)} PDF file(s).')
     return pdf_files
 
@@ -74,8 +73,8 @@ def get_seperation_page_id(pixmap: fitz.Pixmap) -> Optional[SeparatorPage]:
     page_seperator_re = re.compile(r"(?P<uuid>[\dabcdef]{8}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{12}) : (?>Side.)?(?P<side>FRONT|BACK)")
 
     try:
-        data = pixmap.tobytes("png", 100)
-        stream_str = io.BytesIO(data)
+        data: bytes = bytes(pixmap.tobytes("png", 100))
+        stream_str:io.BytesIO = io.BytesIO(data)
         decodes = decode(Image.open(stream_str), symbols=[ZBarSymbol.QRCODE])
 
         # Decoded(data=b'018ce42b-6294-7b39-8865-6768ae05c816 : BACK', type='QRCODE',
@@ -87,6 +86,9 @@ def get_seperation_page_id(pixmap: fitz.Pixmap) -> Optional[SeparatorPage]:
             text = decoded.data.decode()
             logging.debug(f'QR CODE found: (w;h;quality;orientation;txt) = ({decoded.rect.width};{decoded.rect.height};{decoded.quality};{decoded.orientation};{text}')
             matches = page_seperator_re.search(text)
+            if matches is None:
+                logging.warning(f"QR code found but did not match expected format: {text}")
+                continue
             uuid = matches.group("uuid")
             side = matches.group("side")
             page_info = SeparatorPage(id=uuid, is_front=side == 'FRONT')
@@ -100,7 +102,7 @@ def get_seperation_page_id(pixmap: fitz.Pixmap) -> Optional[SeparatorPage]:
     return page_info
 
 
-def parse_pdf_files(pdf_files, debug_dir=None):
+def parse_pdf_files(pdf_files: List[Path], debug_dir: Path|None = None):
     logging.debug('Scanning PDF files.')
 
     input_documents: List[Document] = []
@@ -131,7 +133,7 @@ def parse_pdf_files(pdf_files, debug_dir=None):
                 decoded_page = get_seperation_page_id(pix)
                 if decoded_page:
                     page_info = decoded_page
-                    break;
+                    break
 
             document_structure.append(page_info)
         input_document.pages = document_structure
@@ -157,13 +159,13 @@ def all_separators_found(documents: List[Document]) -> bool:
                         separators[id].append(is_front)
                 else:
                     separators[id]=[is_front]
-    for s_key, s_value in separators.items():
+    for _, s_value in separators.items():
         if len(s_value) != 2:
             logging.error(f"Missing counterpart for {id} with is_front{is_front}")
             check_is_ok = False
 
     if len(separators) < 2:
-        logging.error(f"Expecting at least 2 separator sheets")
+        logging.error("Expecting at least 2 separator sheets")
         check_is_ok = False
     return check_is_ok
 
@@ -261,32 +263,44 @@ def split_documents(documents: List[Document]) -> Dict[str, List[Page]]:
     return split_pages
 
 def create_documents_definitions(outputdir: Path, mergedpages: Dict[str, List[Page]]) -> Dict[Path, List[Page]]:
+    def add_collected_to_documents(file_name: Optional[Path], collect_pages: List[Page], documents: Dict[Path, List[Page]]) -> None:
+        if file_name is None:
+            logging.warning("Expected a separator page as first page of the document")
+            return
+        if len(collect_pages):
+            documents[file_name] = collect_pages
+
     documents: Dict[Path, List[Page]] = {}
-    for id, pages in mergedpages.items():
+    for _, pages in mergedpages.items():
         file_name = None
+        # collect_pages will contain the pages of the current document, 
+        # which are collected until a separator page is found. When a separator page is found, 
+        # the collected pages are stored in the documents map with the file name of the separator page as key. 
+        # Then the file name is updated to the new separator page and the collection of pages starts again.
         collect_pages: List[Page] = []
 
         for page in pages:
             if isinstance(page, SeparatorPage):
-                if len(collect_pages):
-                    documents[file_name] = collect_pages
-                    collect_pages = []
+                add_collected_to_documents(file_name, collect_pages, documents)
+                collect_pages = []
                 file_name = outputdir / (page.id + ".pdf")
             elif isinstance(page, DocumentPage):
                 collect_pages.append(page)
 
         if len(collect_pages):
-            documents[file_name] = collect_pages
+            add_collected_to_documents(file_name, collect_pages, documents)
 
     return documents
 
 
-def store_document(output_path: Path, pages: List[Page]) -> None:
+ 
+def store_document(output_path: Path, pages: List[DocumentPage]) -> None:
     input_file_paths = list(set([page.sourcePath for page in pages]))
 
     merger = PdfWriter()
+    readers: Dict[Path, Any] = {}
     try:
-        readers: Dict[Path, Any] = {p: open(p, "rb") for p in input_file_paths}
+        readers = {p: open(p, "rb") for p in input_file_paths}
         for page in pages:
             merger.append(readers[page.sourcePath], pages=(page.index, page.index + 1))
 
@@ -294,7 +308,11 @@ def store_document(output_path: Path, pages: List[Page]) -> None:
             merger.write(output_file)
     finally:
         for r in readers.values():
-            r.close()
+            try:
+                r.close()
+            except Exception as ex:
+                logging.warning(ex)
+
 
     merger.close()
 
@@ -341,7 +359,7 @@ def main():
         msg = f'Input directory does not exist: {input_dir}'
         print(msg)
         logging.error(msg)
-        exit(Errors.MISSING_FOLDER)
+        exit(Errors.MISSING_FOLDER.value)
 
     logging.debug(f'Input folder: {input_dir}')
 
@@ -349,7 +367,7 @@ def main():
         msg = f'Output directory does not exist: {output_dir}'
         print(msg)
         logging.error(msg)
-        exit(Errors.MISSING_FOLDER)
+        exit(Errors.MISSING_FOLDER.value)
     logging.debug(f'Output folder: {output_dir}')
 
 
@@ -357,18 +375,16 @@ def main():
     input_documents: List[Document] = parse_pdf_files(pdf_files, debug_output_dir)
     print_documents(input_documents)
 
-    # TODO: combine the paths again
+    reorganized_pages: Dict[str, List[Page]]
     if args.single_sided:
-        split_pages: Dict[str, List[Page]] = split_documents(input_documents)
-        original_documents: Dict[Path, List[Page]] = create_documents_definitions(output_dir, split_pages)
-        for new_path, pages in original_documents.items():
-            store_document(new_path, pages)
+        reorganized_pages: Dict[str, List[Page]] = split_documents(input_documents)
     else:
-        merged_pages: Dict[str, List[Page]] = merge_documents(input_documents)
-        original_documents: Dict[Path, List[Page]] = create_documents_definitions(output_dir, merged_pages)
+        reorganized_pages: Dict[str, List[Page]] = merge_documents(input_documents)
 
-        for new_path, pages in original_documents.items():
-            store_document(new_path, pages)
+    original_documents: Dict[Path, List[Page]] = create_documents_definitions(output_dir, reorganized_pages)
+
+    for new_path, pages in original_documents.items():
+        store_document(new_path, pages)
 
 
     print("Done!")
