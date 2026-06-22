@@ -1,7 +1,26 @@
 # pdf_scans
 Scripts to handle pdf_scans.
 
-## Merge single side scanned files
+## Table of Contents
+
+- [pdf\_scans](#pdf_scans)
+  - [Table of Contents](#table-of-contents)
+  - [Create Separator Pages](#create-separator-pages)
+  - [Merge Single Side Scanned Files](#merge-single-side-scanned-files)
+
+## Create Separator Pages
+
+Generate separator PDF pages for single-sided document scanning. Each separator page contains a unique QR code for document identification, making it easy to organize and track multiple scanned documents.
+
+```
+  usage: create_separator_page.py [-h] [--number NUMBER]
+
+  options:
+    -h, --help         show this help message and exit
+    --number NUMBER    Number of separator pages to generate. (default: 1)
+```
+
+## Merge Single Side Scanned Files
 
 ```
   usage: merge_single_sidescanned_files.py [-h] [--front FRONT] [--back BACK]
